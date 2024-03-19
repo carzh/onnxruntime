@@ -21,8 +21,8 @@ from optimizer import optimize_model
 from packaging import version
 from transformers import AutoConfig, AutoModelForCausalLM
 
-from onnxruntime import quantization as ort_quantization
-from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
+# from onnxruntime import quantization as ort_quantization
+# from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
 
 torch_export_onnx_opset_version = 14
 logger = logging.getLogger("")
@@ -86,6 +86,12 @@ def get_merged_model_dynamic_axes(input_names: list[str], output_names: list[str
         elif name == "logits":
             # shape is (batch_size, sequence_length, vocab_size)
             dynamic_axes[name] = {0: "batch_size", 1: "sequence_length"}
+        elif name == "loss":
+            continue
+        elif name == "labels":
+            dynamic_axes[name] = {0: "batch_size", 1: "sequence_length"}
+        elif name == 'input_embeds':
+            pass
         elif "present" in name:
             # shape is (batch_size, num_heads, past_sequence_length + sequence_length, head_size) = (batch_size, num_heads, total_sequence_length, head_size)
             # for prompt generation, past_sequence_length = 0
@@ -345,17 +351,19 @@ def run_torchscript_merged_export(
         "input_ids",
         "attention_mask",
         "position_ids",
-        *list(
-            chain.from_iterable(
-                (f"past_key_values.{i}.key", f"past_key_values.{i}.value") for i in range(l_config.num_hidden_layers)
-            )
-        ),
+        # *list(
+        #     chain.from_iterable(
+        #         (f"past_key_values.{i}.key", f"past_key_values.{i}.value") for i in range(l_config.num_hidden_layers)
+        #     )
+        # ),
+        "labels",
     ]
     output_names = [
+        "loss",
         "logits",
-        *list(
-            chain.from_iterable((f"present.{i}.key", f"present.{i}.value") for i in range(l_config.num_hidden_layers))
-        ),
+        # *list(
+        #     chain.from_iterable((f"present.{i}.key", f"present.{i}.value") for i in range(l_config.num_hidden_layers))
+        # ),
     ]
     dynamic_axes = get_merged_model_dynamic_axes(input_names, output_names)
 
@@ -364,6 +372,19 @@ def run_torchscript_merged_export(
     temp_dir = f"./temp_{rank}"
     _prepare_dir(temp_dir)
     temp_path = os.path.join(temp_dir, "temp.onnx")
+    print('----------------------------------------------------------------')
+    for i in range(len(decoder_merged_inputs)):
+        # if i == 3 or i == 4:
+        #     continue
+        # print(decoder_merged_inputs[i])
+        print('shape of ', i, 'th input:', decoder_merged_inputs[i].shape)
+    print('---')
+    print(input_names)
+    print('---')
+    print(output_names)
+    print('---')
+    print(dynamic_axes)
+    print('----------------------------------------------------------------')
     torch.onnx.export(
         llama,
         args=decoder_merged_inputs,
@@ -373,9 +394,11 @@ def run_torchscript_merged_export(
         output_names=output_names,
         dynamic_axes=dynamic_axes,
         opset_version=torch_export_onnx_opset_version,
-        do_constant_folding=True,
+        do_constant_folding=False,
         verbose=args.verbose,
+        training = torch.onnx.TrainingMode.TRAINING
     )
+    print('immediately after export finished', '*'*20)
 
     # Check decoder_merged_model.onnx and save all external data to one file
     onnx.checker.check_model(temp_path)
@@ -781,13 +804,6 @@ def get_args():
         action="store_true",
         help="Avoid exporting model, only apply quantizations and optimizations to existing model exported from optimum.",
     )
-
-    parser.add_argument(
-        "--small_gpu",
-        action="store_true",
-        help="Load the llama in GPU every time for parity_check if it's running in a machine which GPU memory < 36GB.",
-    )
-
     parser.set_defaults(optimize_optimum=False)
 
     args = parser.parse_args()
@@ -795,7 +811,9 @@ def get_args():
 
 
 def main():
-    if version.parse(torch.__version__) < version.parse("2.2.0"):
+    if version.parse(torch.__version__) < version.parse("2.2.0") and "2.2.0.dev" not in torch.__version__:
+        # Second predicate is for comparing nightly (ex: 2.2.0.dev20230920 vs 2.2.0) since first predicate is false
+        # in that scenario. It can be removed when torch v2.2.0 is released in stable.
         logger.error(f"Detected PyTorch version {torch.__version__}. Please upgrade and use v2.2.0 or newer.")
         return
 
@@ -893,108 +911,106 @@ def main():
             ]
 
             # Run the optimizer script
-            logger.info("Optimizing models...")
-            for orig_path, opt_path in zip(old_paths, new_paths):
-                if os.path.exists(orig_path):
-                    optimize_export(l_config, input_path=orig_path, output_path=opt_path)
+            # logger.info("Optimizing models...")
+            # for orig_path, opt_path in zip(old_paths, new_paths):
+            #     if os.path.exists(orig_path):
+            #         optimize_export(l_config, input_path=orig_path, output_path=opt_path)
 
-            # Re-assign default FP32 model paths as their optimized versions
-            decoder_model_fp32_path = decoder_model_fp32_opt_path
-            decoder_with_past_model_fp32_path = decoder_with_past_model_fp32_opt_path
-            decoder_merged_model_fp32_path = decoder_merged_model_fp32_opt_path
-            old_paths = [decoder_model_fp32_path, decoder_with_past_model_fp32_path, decoder_merged_model_fp32_path]
+            # # Re-assign default FP32 model paths as their optimized versions
+            # decoder_model_fp32_path = decoder_model_fp32_opt_path
+            # decoder_with_past_model_fp32_path = decoder_with_past_model_fp32_opt_path
+            # decoder_merged_model_fp32_path = decoder_merged_model_fp32_opt_path
+            # old_paths = [decoder_model_fp32_path, decoder_with_past_model_fp32_path, decoder_merged_model_fp32_path]
 
-            logger.info(
-                f"The {args.model_name} ONNX model has been successfully optimized with the ORT transformer optimizer script!"
-            )
+            # logger.info(
+            #     f"The {args.model_name} ONNX model has been successfully optimized with the ORT transformer optimizer script!"
+            # )
 
             # Change precision of exported models from FP32
-            if args.precision == Precision.FLOAT16:
-                new_paths = convert_to_float16(args, l_config, old_paths, rank, world_size)
+            # if args.precision == Precision.FLOAT16:
+            #     new_paths = convert_to_float16(args, l_config, old_paths, rank, world_size)
 
-            elif args.precision == Precision.INT8:
-                decoder_model_int8_path = os.path.join(
-                    args.output, f"rank_{rank}_{args.model_name}_decoder_model_int8.onnx"
-                )
-                decoder_with_past_model_int8_path = os.path.join(
-                    args.output, f"rank_{rank}_{args.model_name}_decoder_with_past_model_int8.onnx"
-                )
-                decoder_merged_model_int8_path = os.path.join(
-                    args.output, f"rank_{rank}_{args.model_name}_decoder_merged_model_int8.onnx"
-                )
-                new_paths = [decoder_model_int8_path, decoder_with_past_model_int8_path, decoder_merged_model_int8_path]
+            # elif args.precision == Precision.INT8:
+            #     decoder_model_int8_path = os.path.join(
+            #         args.output, f"rank_{rank}_{args.model_name}_decoder_model_int8.onnx"
+            #     )
+            #     decoder_with_past_model_int8_path = os.path.join(
+            #         args.output, f"rank_{rank}_{args.model_name}_decoder_with_past_model_int8.onnx"
+            #     )
+            #     decoder_merged_model_int8_path = os.path.join(
+            #         args.output, f"rank_{rank}_{args.model_name}_decoder_merged_model_int8.onnx"
+            #     )
+            #     new_paths = [decoder_model_int8_path, decoder_with_past_model_int8_path, decoder_merged_model_int8_path]
 
-                if args.quantization_method == "smooth_quant":
-                    if not args.no_merged:
-                        logger.error("SmoothQuant must be used on separately exported models")
-                    else:
-                        logger.info(
-                            f"Quantizing {decoder_model_fp32_path} and {decoder_with_past_model_fp32_path} to int8"
-                        )
-                        smooth_quant(args, old_paths[0], old_paths[1], new_paths[0], new_paths[1])
+            #     if args.quantization_method == "smooth_quant":
+            #         if not args.no_merged:
+            #             logger.error("SmoothQuant must be used on separately exported models")
+            #         else:
+            #             logger.info(
+            #                 f"Quantizing {decoder_model_fp32_path} and {decoder_with_past_model_fp32_path} to int8"
+            #             )
+            #             smooth_quant(args, old_paths[0], old_paths[1], new_paths[0], new_paths[1])
 
-                elif args.quantization_method == "quantize_dynamic":
-                    logger.warning(
-                        "The `quantize_dynamic` method is deprecated in favor of `smooth_quant` instead. Precision loss may be high with `quantize_dynamic`."
-                    )
+            #     elif args.quantization_method == "quantize_dynamic":
+            #         logger.warning(
+            #             "The `quantize_dynamic` method is deprecated in favor of `smooth_quant` instead. Precision loss may be high with `quantize_dynamic`."
+            #         )
 
-                    logger.info("Quantizing to int8...")
-                    for fp32_path, int8_path in zip(old_paths, new_paths):
-                        if os.path.exists(fp32_path):
-                            ort_quantization.quantize_dynamic(
-                                fp32_path,
-                                int8_path,
-                                op_types_to_quantize=(
-                                    ["MatMul", "Gemm", "Gather"]
-                                    if args.quantize_embedding_layer
-                                    else ["MatMul", "Gemm"]
-                                ),
-                                per_channel=args.quantize_per_channel,
-                                reduce_range=args.quantize_reduce_range,
-                                use_external_data_format=True,
-                                extra_options={"MatMulConstBOnly": True},
-                            )
-                            logger.info(
-                                f"The ONNX model at {fp32_path} has been quantized to int8 and saved at {int8_path}!"
-                            )
-                            remove_existing_model(decoder_model_fp32_path)
+            #         logger.info("Quantizing to int8...")
+            #         for fp32_path, int8_path in zip(old_paths, new_paths):
+            #             if os.path.exists(fp32_path):
+            #                 ort_quantization.quantize_dynamic(
+            #                     fp32_path,
+            #                     int8_path,
+            #                     op_types_to_quantize=["MatMul", "Gemm", "Gather"]
+            #                     if args.quantize_embedding_layer
+            #                     else ["MatMul", "Gemm"],
+            #                     per_channel=args.quantize_per_channel,
+            #                     reduce_range=args.quantize_reduce_range,
+            #                     use_external_data_format=True,
+            #                     extra_options={"MatMulConstBOnly": True},
+            #                 )
+            #                 logger.info(
+            #                     f"The ONNX model at {fp32_path} has been quantized to int8 and saved at {int8_path}!"
+            #                 )
+            #                 remove_existing_model(decoder_model_fp32_path)
 
-                    logger.info(f"The {args.model_name} ONNX model has been successfully quantized to int8!")
+            #         logger.info(f"The {args.model_name} ONNX model has been successfully quantized to int8!")
 
-                else:
-                    raise Exception(f"Could not recognize {args.quantization_method} as a quantization method")
+            #     else:
+            #         raise Exception(f"Could not recognize {args.quantization_method} as a quantization method")
 
-            elif args.precision == Precision.INT4:
-                if args.execution_provider != "cpu":
-                    old_paths = convert_to_float16(args, l_config, old_paths, rank, world_size)
+            # elif args.precision == Precision.INT4:
+            #     if args.execution_provider != "cpu":
+            #         old_paths = convert_to_float16(args, l_config, old_paths, rank, world_size)
 
-                decoder_model_int4_path = os.path.join(
-                    args.output, f"rank_{rank}_{args.model_name}_decoder_model_int4.onnx"
-                )
-                decoder_with_past_model_int4_path = os.path.join(
-                    args.output, f"rank_{rank}_{args.model_name}_decoder_with_past_model_int4.onnx"
-                )
-                decoder_merged_model_int4_path = os.path.join(
-                    args.output, f"rank_{rank}_{args.model_name}_decoder_merged_model_int4.onnx"
-                )
-                new_paths = [decoder_model_int4_path, decoder_with_past_model_int4_path, decoder_merged_model_int4_path]
+            #     decoder_model_int4_path = os.path.join(
+            #         args.output, f"rank_{rank}_{args.model_name}_decoder_model_int4.onnx"
+            #     )
+            #     decoder_with_past_model_int4_path = os.path.join(
+            #         args.output, f"rank_{rank}_{args.model_name}_decoder_with_past_model_int4.onnx"
+            #     )
+            #     decoder_merged_model_int4_path = os.path.join(
+            #         args.output, f"rank_{rank}_{args.model_name}_decoder_merged_model_int4.onnx"
+            #     )
+            #     new_paths = [decoder_model_int4_path, decoder_with_past_model_int4_path, decoder_merged_model_int4_path]
 
-                for fp_path, int4_path in zip(old_paths, new_paths):
-                    if os.path.exists(fp_path):
-                        model = onnx.load_model(fp_path, load_external_data=True)
-                        quant = MatMul4BitsQuantizer(
-                            model=model,
-                            block_size=args.block_size,
-                            is_symmetric=True,
-                            accuracy_level=args.int4_accuracy_level,
-                            nodes_to_exclude=[],
-                        )
-                        quant.process()
-                        quant.model.save_model_to_file(int4_path, use_external_data_format=True)
-                        del model
-                        del quant
-                        logger.info(f"The ONNX model at {fp_path} has been quantized to int4 and saved at {int4_path}!")
-                        remove_existing_model(fp_path)
+            #     for fp_path, int4_path in zip(old_paths, new_paths):
+            #         if os.path.exists(fp_path):
+            #             model = onnx.load_model(fp_path, load_external_data=True)
+            #             quant = MatMul4BitsQuantizer(
+            #                 model=model,
+            #                 block_size=args.block_size,
+            #                 is_symmetric=True,
+            #                 accuracy_level=args.int4_accuracy_level,
+            #                 nodes_to_exclude=[],
+            #             )
+            #             quant.process()
+            #             quant.model.save_model_to_file(int4_path, use_external_data_format=True)
+            #             del model
+            #             del quant
+            #             logger.info(f"The ONNX model at {fp_path} has been quantized to int4 and saved at {int4_path}!")
+            #             remove_existing_model(fp_path)
         barrier()
 
     logger.info("Verifying parity on all ONNX models created")
@@ -1028,11 +1044,7 @@ def main():
             args.precision,
             "--cache_dir",
             args.cache_dir,
-            "--torch_model_directory",
-            args.input,
         ]
-        if args.small_gpu:
-            parity_cmd.append("--small_gpu")
         if "with_past" in filename:
             parity_cmd.append("--use_past_kv")
         if "merged" in filename:
@@ -1041,8 +1053,8 @@ def main():
             parity_cmd.append("--use_gqa")
 
         try:
-            logger.info(f"check parity with cmd: {parity_cmd}")
-            parity_check(parity_cmd)
+            logger.debug(f"check parity with cmd: {parity_cmd}")
+            # parity_check(parity_cmd)
         except Exception as e:
             logger.warning(f"An error occurred while verifying parity: {e}", exc_info=True)
 

@@ -128,14 +128,17 @@ def get_merged_sample_with_past_kv_inputs(
     world_size: int = 1,
 ):
     input_ids = torch.randint(low=0, high=config.vocab_size, size=(batch_size, seq_len), dtype=torch.int64)
-    attention_mask = torch.ones(batch_size, past_seq_len + seq_len, dtype=torch.int64)
+    attention_mask = torch.ones(batch_size, seq_len, dtype=torch.int64)
+    labels = torch.ones(batch_size, seq_len, dtype=torch.int64)
     # position_ids is of shape (batch_size, seq_len) for prompt generation, (batch_size, 1) for token generation
-    position_ids = get_position_ids(attention_mask, use_past_kv=(past_seq_len != 0))
+    # position_ids = get_position_ids(attention_mask, use_past_kv=(past_seq_len != 0))
+    position_ids = get_position_ids(attention_mask, use_past_kv=False)
     past_kv = get_past_kv_inputs(config, batch_size, past_seq_len, use_fp16, world_size=world_size)
 
     # Convert inputs to NumPy (for ORT) or send to device (for PyTorch)
     input_ids = input_ids.numpy() if engine == "ort" else input_ids.to(device)
     attention_mask = attention_mask.numpy() if engine == "ort" else attention_mask.to(device)
+    labels = labels.numpy() if engine == "ort" else labels.to(device)
     position_ids = position_ids.numpy() if engine == "ort" else position_ids.to(device)
     past_kv = (
         flatten_past_kv_inputs(past_kv)
@@ -145,24 +148,26 @@ def get_merged_sample_with_past_kv_inputs(
 
     if not return_dict:
         # For export
-        assert isinstance(past_kv, list)
-        return (input_ids, attention_mask, position_ids, past_kv)
+        # assert isinstance(past_kv, list)
+        # return (input_ids, attention_mask, labels)
+        return (input_ids, attention_mask, position_ids, labels)
 
     inputs = {
         "input_ids": input_ids,
         "attention_mask": attention_mask,
         "position_ids": position_ids,
+        "labels": labels,
     }
-    if engine == "ort":
-        assert isinstance(past_kv, dict)
-        inputs.update(past_kv)
+    # if engine == "ort"`:
+    #     assert isinstance(past_kv, dict)
+    #     inputs.update(past_kv)
 
-        if use_gqa:
-            inputs = enable_past_present_share_buffer(inputs, past_seq_len, max_seq_len)
+    #     if use_gqa:
+    #         inputs = enable_past_present_share_buffer(inputs, past_seq_len, max_seq_len)
 
-    else:
-        assert isinstance(past_kv, list)
-        inputs["past_key_values"] = past_kv
+    # else:
+    #     assert isinstance(past_kv, list)
+    #     inputs["past_key_values"] = past_kv
 
     return inputs
 
@@ -222,8 +227,7 @@ def get_msft_sample_inputs(
 # Create past_key_values
 # Each is of shape (batch_size, num_heads, past_sequence_length, head_size)
 def get_past_kv_inputs(config: AutoConfig, batch_size: int, past_seq_len: int, use_fp16: bool, world_size: int = 1):
-    num_heads = config.num_key_value_heads // world_size
-    head_size = config.head_dim if hasattr(config, "head_dim") else config.hidden_size // config.num_attention_heads
+    num_heads, head_size = config.num_key_value_heads // world_size, config.hidden_size // config.num_attention_heads
     torch_dtype = torch.float16 if use_fp16 else torch.float32
     past_kv = [
         (
@@ -287,14 +291,7 @@ def add_io_bindings(
 ):
     io_binding = model.io_binding()
 
-    model_inputs = set(map(lambda i: i.name, model.get_inputs()))
     for k, v in ort_inputs.items():
-        # Use this check to handle scenarios such as INT4 CUDA and FP16 CUDA models with
-        # GQA + RotaryEmbedding fusion where `position_ids` is removed as an ONNX model input
-        # but `position_ids` is used as a PyTorch model input
-        if k not in model_inputs:
-            continue
-
         # Bind OrtValue inputs to device
         if use_gqa and ("cache" in k or "past_key_values" in k):
             if k not in kv_cache_ortvalues:
