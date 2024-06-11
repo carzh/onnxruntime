@@ -101,10 +101,22 @@ class CrossEntropyLoss(blocks.Block):
         loss_node_input_names = [scores_input_name, labels_name]
         if self._weight:
             loss_node_input_names.append(weight_name)
+
         loss_node_output_name = _graph_utils.generate_graph_name("loss")
+        log_prob_output_name = _graph_utils.generate_graph_name("log_prob")
+
+        shape_of_scores_input = _graph_utils.get_shape_list_from_valueinfoproto(_graph_utils.get_output_from_output_name(self.base, scores_input_name))
+
+        shape_of_loss = None
+        if self._reduction == "none":
+            shape_of_loss = shape_of_scores_input
+
+        loss_node_valueinfo = onnx.helper.make_tensor_value_info(loss_node_output_name, onnx.TensorProto.FLOAT, shape_of_loss)
+        log_prob_valueinfo = onnx.helper.make_tensor_value_info(log_prob_output_name, onnx.TensorProto.FLOAT, shape_of_scores_input)
+
         loss_node_output_names = [
             loss_node_output_name,
-            _graph_utils.generate_graph_name("log_prob"),
+            log_prob_output_name
         ]
         loss_node = onnx.helper.make_node(
             "SoftmaxCrossEntropyLoss",
@@ -115,6 +127,7 @@ class CrossEntropyLoss(blocks.Block):
             name=_graph_utils.generate_graph_name("SoftmaxCrossEntropyLoss"),
         )
         self.base.graph.node.append(loss_node)
+        self.base.graph.value_info.extend([loss_node_valueinfo, log_prob_valueinfo])
 
         return loss_node_output_name
 

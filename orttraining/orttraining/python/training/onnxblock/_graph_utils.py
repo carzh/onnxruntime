@@ -85,3 +85,17 @@ def node_arg_exists(model: onnx.ModelProto, node_arg_name: str) -> bool:
             return True
 
     return False
+
+
+def get_shape_list_from_valueinfoproto(val: onnx.ValueInfoProto) -> List[int]:
+    tensorshapeproto = val.type.tensor_type.shape
+    shape_list = []
+
+    for i in range(len(tensorshapeproto.dim)):
+        dim = tensorshapeproto.dim[i]
+        if dim.dim_value:
+            shape_list.append(dim.dim_value)
+        elif dim.dim_param:
+            shape_list.append(dim.dim_param)
+
+    return shape_list

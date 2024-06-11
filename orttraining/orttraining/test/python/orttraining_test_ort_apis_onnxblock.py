@@ -1,6 +1,7 @@
 import copy
 import io
 import os
+import pathlib
 import random
 import tempfile
 
@@ -206,6 +207,32 @@ def _get_training_ort_inputs(x, target, pt_model, onnx_model, target_type=None):
     return ort_inputs
 
 
+def get_root_ort_path():
+    curr_dir = pathlib.Path.cwd()
+
+    if curr_dir.name == "onnxruntime":
+        return curr_dir
+
+    for parent in list(curr_dir.parents):
+        if parent.name == "onnxruntime":
+            return parent
+
+    raise RuntimeError("Cannot find ONNXRuntime root directory.")
+
+
+def get_string_path_to_testdata_onnx_file(onnx_file_name):
+    from_build_dir = pathlib.Path(f"testdata/{onnx_file_name}")
+
+    if from_build_dir.is_file():
+        return str(from_build_dir)
+    else:
+        ort_root = get_root_ort_path()
+        path_to_testdata_onnx_file = ort_root / "onnxruntime" / "test" / "testdata" / f"{onnx_file_name}"
+        if path_to_testdata_onnx_file.is_file():
+            return str(path_to_testdata_onnx_file)
+        raise RuntimeError(f"Cannot find the path for {onnx_file_name}")
+
+
 # All unit tests
 
 
@@ -318,6 +345,8 @@ def test_crossentropy_loss_execution():
 
         ort_outs = ort_session.run(ort_output_names, ort_inputs)
         torch_outs = crossentropy_loss(pt_model(x), target)
+        print("ort_ outs", ort_outs)
+        print("torch outs", torch_outs)
 
         # Then
         assert np.allclose(ort_outs[0], _to_numpy(torch_outs))
@@ -356,6 +385,8 @@ def test_bcewithlogits_loss_execution():
 
         ort_outs = ort_session.run(ort_output_names, ort_inputs)
         torch_outs = bcewithlogits_loss(pt_model(x), target)
+        print("ort_ outs", ort_outs)
+        print("torch outs", torch_outs)
 
         # Then
         assert np.allclose(ort_outs[0], _to_numpy(torch_outs))
@@ -1020,6 +1051,8 @@ def test_save_ort_format():
         if base_opsets[""] != optimizer_opsets[""]:
             raise AssertionError(f"Opsets mismatch {base_opsets['']} != {optimizer_opsets['']}.")
 
+    assert False
+
 
 def test_custom_loss_function():
     # This test tries to add a custom loss function to the model.
@@ -1099,3 +1132,58 @@ def test_custom_optimizer_block():
                 for attr in node.attribute:
                     if attr.name == "weight_decay":
                         assert attr.f == weight_decay
+
+
+def test_generate_artifacts_path():
+    mnist_file_path = get_string_path_to_testdata_onnx_file("mnist.onnx")
+    requires_grad_params = ["Parameter194", "Parameter193"]
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        artifacts.generate_artifacts(
+            mnist_file_path,
+            requires_grad=requires_grad_params,
+            loss=artifacts.LossType.CrossEntropyLoss,
+            optimizer=artifacts.OptimType.AdamW,
+            artifact_directory=temp_dir,
+        )
+
+        assert os.path.exists(os.path.join(temp_dir, "training_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "eval_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "optimizer_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "checkpoint"))
+
+
+def test_generate_artifacts_external_data():
+    # bart_tiny_file_path = get_string_path_to_testdata_onnx_file("bart_tiny.onnx")
+    # requires_grad_params = [
+    #     "model_.encoder.layers.0.self_attn_layer_norm.weight",
+    #     "model_.encoder.layers.0.self_attn_layer_norm.bias",
+    # ]
+
+    mnist_file_path = get_string_path_to_testdata_onnx_file("mnist.onnx")
+    requires_grad_params = ["Parameter194", "Parameter193"]
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # bart_tiny_onnx_model = onnx.load(bart_tiny_file_path)
+        mnist_onnx = onnx.load(mnist_file_path)
+
+        onnx.save_model(
+            mnist_onnx,
+            os.path.join(temp_dir, "mnist_external.onnx"),
+            save_as_external_data=True,
+            all_tensors_to_one_file=True,
+            size_threshold=0,
+        )
+
+        artifacts.generate_artifacts(
+            os.path.join(temp_dir, "mnist_external.onnx"),
+            requires_grad=requires_grad_params,
+            loss=artifacts.LossType.CrossEntropyLoss,
+            optimizer=artifacts.OptimType.AdamW,
+            artifact_directory=temp_dir,
+        )
+
+        assert os.path.exists(os.path.join(temp_dir, "training_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "eval_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "optimizer_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "checkpoint"))

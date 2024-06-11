@@ -16,6 +16,7 @@ from onnxruntime.training import onnxblock
 # threshold for the size of the modelproto where you should use a path instead
 USE_PATH_THRESHOLD = 2147483648
 
+
 class LossType(Enum):
     """Loss type to be added to the training model.
 
@@ -63,7 +64,7 @@ def generate_artifacts(
     All generated ModelProtos will use the same opsets defined by *model*.
 
     Args:
-        model: The base model or path to the base model to be used for gradient graph generation. For models >2GB, 
+        model: The base model or path to the base model to be used for gradient graph generation. For models >2GB,
             use the path to the base model.
         requires_grad: List of names of model parameters that require gradient computation
         frozen_params: List of names of model parameters that should be frozen.
@@ -104,7 +105,7 @@ def generate_artifacts(
         model_path = None
     else:
         raise RuntimeError("Please pass in either a string or an ONNX ModelProto for the model.")
-        
+
     loss_blocks = {
         LossType.MSELoss: onnxblock.loss.MSELoss,
         LossType.CrossEntropyLoss: onnxblock.loss.CrossEntropyLoss,
