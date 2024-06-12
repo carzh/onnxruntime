@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 import logging
+import os
 from abc import abstractmethod
 from typing import List, Tuple
-import os
 
 import onnx
 
@@ -14,6 +14,7 @@ import onnxruntime.training.onnxblock.blocks as blocks
 import onnxruntime.training.onnxblock.model_accessor as accessor
 
 TEMP_ONNX_PATH = "temp.onnx"
+
 
 class ForwardBlock(blocks.Block):
     """Base class for all blocks that require forward model to be automatically built.
@@ -73,7 +74,7 @@ class ForwardBlock(blocks.Block):
         output = self.build(*args, **kwargs)
 
         if accessor._GLOBAL_ACCESSOR.has_path:
-            onnx.save(self.base, TEMP_ONNX_PATH, save_as_external_data = True, all_tensors_to_one_file=True)
+            onnx.save(self.base, TEMP_ONNX_PATH, save_as_external_data=True, all_tensors_to_one_file=True)
 
             onnx.shape_inference.infer_shapes_path(TEMP_ONNX_PATH)
             # shape inferenced model is saved to original path
@@ -204,7 +205,7 @@ class TrainingBlock(blocks.Block):
 
         model = None
         if accessor._GLOBAL_ACCESSOR.has_path:
-            onnx.save(self.base, TEMP_ONNX_PATH, save_as_external_data = True, all_tensors_to_one_file=True)
+            onnx.save(self.base, TEMP_ONNX_PATH, save_as_external_data=True, all_tensors_to_one_file=True)
 
             onnx.shape_inference.infer_shapes_path(TEMP_ONNX_PATH)
             # shape inferenced model is saved to original path

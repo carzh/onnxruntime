@@ -1051,8 +1051,6 @@ def test_save_ort_format():
         if base_opsets[""] != optimizer_opsets[""]:
             raise AssertionError(f"Opsets mismatch {base_opsets['']} != {optimizer_opsets['']}.")
 
-    assert False
-
 
 def test_custom_loss_function():
     # This test tries to add a custom loss function to the model.
@@ -1135,12 +1133,19 @@ def test_custom_optimizer_block():
 
 
 def test_generate_artifacts_path():
-    mnist_file_path = get_string_path_to_testdata_onnx_file("mnist.onnx")
-    requires_grad_params = ["Parameter194", "Parameter193"]
 
     with tempfile.TemporaryDirectory() as temp_dir:
+        _, simple_net = _get_models("cpu", 32, 28, 10, 10)
+
+        requires_grad_params = ["fc1.weight", "fc1.bias", "fc2.weight", "fc2.bias"]
+
+        onnx.save_model(
+            simple_net,
+            os.path.join(temp_dir, "simple_net.onnx"),
+        )
+
         artifacts.generate_artifacts(
-            mnist_file_path,
+            os.path.join(temp_dir, "simple_net.onnx"),
             requires_grad=requires_grad_params,
             loss=artifacts.LossType.CrossEntropyLoss,
             optimizer=artifacts.OptimType.AdamW,
@@ -1153,30 +1158,50 @@ def test_generate_artifacts_path():
         assert os.path.exists(os.path.join(temp_dir, "checkpoint"))
 
 
-def test_generate_artifacts_external_data():
-    # bart_tiny_file_path = get_string_path_to_testdata_onnx_file("bart_tiny.onnx")
-    # requires_grad_params = [
-    #     "model_.encoder.layers.0.self_attn_layer_norm.weight",
-    #     "model_.encoder.layers.0.self_attn_layer_norm.bias",
-    # ]
-
-    mnist_file_path = get_string_path_to_testdata_onnx_file("mnist.onnx")
-    requires_grad_params = ["Parameter194", "Parameter193"]
-
+def test_generate_artifacts_external_data_one_file():
     with tempfile.TemporaryDirectory() as temp_dir:
-        # bart_tiny_onnx_model = onnx.load(bart_tiny_file_path)
-        mnist_onnx = onnx.load(mnist_file_path)
+        _, simple_net = _get_models("cpu", 32, 28, 10, 10)
+
+        requires_grad_params = ["fc1.weight", "fc1.bias", "fc2.weight", "fc2.bias"]
 
         onnx.save_model(
-            mnist_onnx,
-            os.path.join(temp_dir, "mnist_external.onnx"),
+            simple_net,
+            os.path.join(temp_dir, "simple_net.onnx"),
             save_as_external_data=True,
             all_tensors_to_one_file=True,
             size_threshold=0,
         )
 
         artifacts.generate_artifacts(
-            os.path.join(temp_dir, "mnist_external.onnx"),
+            os.path.join(temp_dir, "simple_net.onnx"),
+            requires_grad=requires_grad_params,
+            loss=artifacts.LossType.CrossEntropyLoss,
+            optimizer=artifacts.OptimType.AdamW,
+            artifact_directory=temp_dir,
+        )
+
+        assert os.path.exists(os.path.join(temp_dir, "training_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "eval_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "optimizer_model.onnx"))
+        assert os.path.exists(os.path.join(temp_dir, "checkpoint"))
+
+
+def test_generate_artifacts_external_data_separate_files():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        _, simple_net = _get_models("cpu", 32, 28, 10, 10)
+
+        requires_grad_params = ["fc1.weight", "fc1.bias", "fc2.weight", "fc2.bias"]
+
+        onnx.save_model(
+            simple_net,
+            os.path.join(temp_dir, "simple_net.onnx"),
+            save_as_external_data=True,
+            all_tensors_to_one_file=False,
+            size_threshold=0,
+        )
+
+        artifacts.generate_artifacts(
+            os.path.join(temp_dir, "simple_net.onnx"),
             requires_grad=requires_grad_params,
             loss=artifacts.LossType.CrossEntropyLoss,
             optimizer=artifacts.OptimType.AdamW,
