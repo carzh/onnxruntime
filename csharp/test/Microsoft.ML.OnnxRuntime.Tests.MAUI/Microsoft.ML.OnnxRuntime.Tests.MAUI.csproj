@@ -72,7 +72,7 @@
 	OnnxRuntimeBuildDirectory is set to the build output directory.	Adjust the build path if necessary.
 	-->
 	<PropertyGroup>
-		<PrebuiltRuntimesDir>$(OnnxRuntimeRoot)\build\microsoft.ml.onnxruntime.1.18.1\runtimes</PrebuiltRuntimesDir>
+		<PrebuiltRuntimesDir>$(OnnxRuntimeRoot)\build\runtimes</PrebuiltRuntimesDir>
 		<!--
 		set this so Microsoft.ML.OnnxRuntime.Tests.Common.csproj lets us do the include of the native library
 		as it may come from a local build or a nuget package. This saves duplicating the include logic.
