@@ -10,13 +10,13 @@ namespace Microsoft.ML.OnnxRuntime.Tests.MAUI;
 internal partial class AppiumHelper : IDisposable
 {
     private AppiumLocalServer? server;
-    private AppiumDriver? driver;
+    private static AppiumDriver? driver;
     private bool disposedValue;
 
     public const string DefaultHostAddress = "127.0.0.1";
     public const int DefaultHostPort = 4723;
 
-    public AppiumDriver App => driver ?? throw new NullReferenceException("AppiumDriver is null");
+    public static AppiumDriver App => driver ?? throw new NullReferenceException("AppiumDriver is null");
 
     public AppiumHelper()
     {
@@ -77,7 +77,7 @@ class AppiumLocalServer : IDisposable
         var builder = new AppiumServiceBuilder()
             .WithIPAddress(host)
             .WithArguments(options)
-            .WithLogFile(new FileInfo(@"D:\temp\appium_helper.log"))
+            .WithLogFile(new FileInfo(@"C:\Users\carolinezhu\Documents\cowboy-coding\appium-server-logs\appium-server.log"))
             .UsingPort(port);
 
         // TODO: User should make sure node.exe is in the path, or NODE_BINARY_PATH
