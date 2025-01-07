@@ -3,17 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using NUnit.Framework;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Android;
 
 namespace TestProject1;
-public partial class AppiumSetup
+public class AppiumSetup
 {
     private static AppiumDriver? driver;
 
     public static AppiumDriver App => driver ?? throw new NullReferenceException("AppiumDriver is null");
 
-    public AppiumSetup()
+
+    [SetUp]
+    public void Init()
     {
         // If you started an Appium server manually, make sure to comment out the next line
         // This line starts a local Appium server for you as part of the test run
@@ -37,6 +40,7 @@ public partial class AppiumSetup
         driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), androidOptions);
     }
 
+    [TearDown]
     public void Dispose()
     {
         driver?.Quit();

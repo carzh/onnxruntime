@@ -8,46 +8,27 @@ using OpenQA.Selenium.Appium.Interfaces;
 using OpenQA.Selenium.Appium.Windows;
 using OpenQA.Selenium.DevTools.V119.DOMStorage;
 using TestProject1;
-using Xunit;
-using Xunit.Abstractions;
+using NUnit.Framework;
 
 namespace TestProject1;
-// Add a CollectionDefinition together with a ICollectionFixture
-// to ensure that setting up the Appium server only runs once
-// xUnit does not have a built-in concept of a fixture that only runs once for the whole test set.
-[CollectionDefinition("UITest")]
-public sealed class UITestsCollectionDefinition : ICollectionFixture<AppiumSetup>
-{
-
-}
-
-// Add all tests to the same collection as above so that the Appium server is only setup once
-[Collection("UITest")]
 public class MainPageTests
 {
     protected AppiumDriver App => AppiumSetup.App;
 
-    private readonly ITestOutputHelper _output;
-
-    public MainPageTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-
-    [Fact]
+    [Test]
     public void FailingOutputTest()
     {
         throw new Exception("This is meant to fail.");
     }
 
-    [Fact]
+    [Test]
     public void SuccessfulTest()
     {
         Assert.True(true);
     }
 
 
-    [Fact]
+    [Test]
     public async Task ClickRunAllTest()
     {
 
