@@ -1,13 +1,16 @@
 userName: ortmobile_mghN7n
 accessKey: kbWVmq3jne4VhZxzuygX
-app: C:\Users\carolinezhu\ort\csharp\test\Microsoft.ML.OnnxRuntime.Tests.MAUI\bin\Release\net8.0-android\publish\ORT.CSharp.Tests.MAUI-Signed.apk
+app: bs://677818f85edc4403f105caae35f3367cce2ccb5d
 platforms:
   - platformName: android
     deviceName: Samsung Galaxy S22 Ultra
     platformVersion: 12.0
   - platformName: android
+    deviceName: Google Pixel 7 Pro
+    platformVersion: 13.0
+  - platformName: android
+    deviceName: OnePlus 9
     platformVersion: 11.0
-    deviceName: Google Pixel 4
 browserstackLocal: true
 buildName: ORT android test
 buildIdentifier: ${BUILD_NUMBER}

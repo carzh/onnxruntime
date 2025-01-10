@@ -10,9 +10,13 @@ using OpenQA.Selenium.Appium.Android;
 namespace TestProject1;
 public class AppiumSetup
 {
-    private static AppiumDriver? driver;
+    //private static AppiumDriver? driver;
 
-    public static AppiumDriver App => driver ?? throw new NullReferenceException("AppiumDriver is null");
+    //public static AppiumDriver App => driver ?? throw new NullReferenceException("AppiumDriver is null");
+
+    public AndroidDriver driver;
+
+    public AppiumSetup() { }
 
 
     [SetUp]

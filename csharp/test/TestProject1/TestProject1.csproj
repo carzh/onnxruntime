@@ -19,8 +19,4 @@
 		<PackageReference Include="NUnit3TestAdapter" Version="4.3.1" />
 	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Microsoft.ML.OnnxRuntime.Tests.MAUI\Microsoft.ML.OnnxRuntime.Tests.MAUI.csproj" />
-  </ItemGroup>
-
 </Project>

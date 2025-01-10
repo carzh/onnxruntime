@@ -11,9 +11,10 @@ using TestProject1;
 using NUnit.Framework;
 
 namespace TestProject1;
-public class MainPageTests
+[TestFixture]
+public class MainPageTests : AppiumSetup
 {
-    protected AppiumDriver App => AppiumSetup.App;
+    public MainPageTests() : base() { }
 
     [Test]
     public void FailingOutputTest()
@@ -32,7 +33,7 @@ public class MainPageTests
     public async Task ClickRunAllTest()
     {
 
-        IReadOnlyCollection<AppiumElement> btnElements = App.FindElements(By.XPath("//Button"));
+        IReadOnlyCollection<AppiumElement> btnElements = driver.FindElements(By.XPath("//Button"));
 
         AppiumElement? btn = null;
         foreach (var element in btnElements)
@@ -45,7 +46,7 @@ public class MainPageTests
             }
         }
 
-        Assert.NotNull(btn ?? throw new Xunit.Sdk.XunitException("Run All button was not found."));
+        Assert.That(btn, Is.Not.Null, "Run All button was not found.");
 
         while (!btn.Enabled)
         {
@@ -53,7 +54,7 @@ public class MainPageTests
             await Task.Delay(500);
         }
 
-        IReadOnlyCollection<AppiumElement> labelElements = App.FindElements(By.XPath("//Text"));
+        IReadOnlyCollection<AppiumElement> labelElements = driver.FindElements(By.XPath("//Text"));
         int numPassed = -1;
         int numFailed = -1;
 
@@ -87,12 +88,12 @@ public class MainPageTests
             return;
         }
 
-        AppiumElement filterSelector = App.FindElement(By.XPath("//ComboBox"));
+        AppiumElement filterSelector = driver.FindElement(By.XPath("//ComboBox"));
 
         filterSelector.Click();
         await Task.Delay(500);
 
-        IReadOnlyCollection<AppiumElement> filterOptions = App.FindElements(By.XPath("//ListItem"));
+        IReadOnlyCollection<AppiumElement> filterOptions = driver.FindElements(By.XPath("//ListItem"));
 
         foreach (var filterOption in filterOptions)
         {
@@ -108,7 +109,7 @@ public class MainPageTests
 
         sb.AppendLine("PASSED TESTS: " + numPassed + " | FAILED TESTS: " + numFailed);
 
-        IReadOnlyCollection<AppiumElement> textResults = App.FindElements(By.XPath("//Text"));
+        IReadOnlyCollection<AppiumElement> textResults = driver.FindElements(By.XPath("//Text"));
 
         foreach (var element in textResults)
         {
