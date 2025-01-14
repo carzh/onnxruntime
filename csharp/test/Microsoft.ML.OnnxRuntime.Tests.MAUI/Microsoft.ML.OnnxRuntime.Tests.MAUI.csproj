@@ -50,8 +50,8 @@
 
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>..\..\OnnxRuntime.snk</AssemblyOriginatorKeyFile>
-		<TrimMode>partial</TrimMode>
-		<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
+		<!--<TrimMode>partial</TrimMode>
+		<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>-->
     </PropertyGroup>
 
     <ItemGroup>
@@ -124,16 +124,13 @@
 	<PropertyGroup Condition="'$(IsAndroidTarget)' !='true'">
 		<GenerateProgramFile>false</GenerateProgramFile>
 		<DefaultLanguage>en</DefaultLanguage>
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<AndroidUseAapt2>true</AndroidUseAapt2>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
 		<GenerateProgramFile>true</GenerateProgramFile>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-android|AnyCPU'">
-	  <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-		<AndroidUseAapt2>true</AndroidUseAapt2>
-	  <AndroidPackageFormat>apk</AndroidPackageFormat>
 	</PropertyGroup>
 
 	<!--<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-android|AnyCPU'">
