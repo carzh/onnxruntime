@@ -16,16 +16,38 @@ public class MainPageTests : AppiumSetup
 {
     public MainPageTests() : base() { }
 
+    /// <summary>
+    /// According to https://www.browserstack.com/docs/app-automate/appium/set-up-tests/mark-tests-as-pass-fail
+    /// BrowserStack does not know whether your test's assertions have passed or failed. This only seems to apply
+    /// to functions with multiple assertions. 
+    /// 
+    /// This function handles communicating a pass / fail status to BrowserStack.
+    /// </summary>
+    /// <param name="condition"></param>
+    //public void browserStackTest(bool condition, )
+    //{
+
+    //}
+
     [Test]
     public void FailingOutputTest()
     {
-        throw new Exception("This is meant to fail.");
+        browserStackLog("TESTING");
+        //throw new Exception("This is meant to fail.");
+        Assert.That(false);
     }
 
     [Test]
     public void SuccessfulTest()
     {
-        Assert.True(true);
+        ((IJavaScriptExecutor)driver).ExecuteScript("browserstack_executor: {\"action\": \"annotate\", \"arguments\": {\"data\":\"Scenario : Search in Wiki\", \"level\": \"info\"}}");
+        Assert.That(true);
+    }
+
+    [Test]
+    public void TestLessThan()
+    {
+        Assert.That(2, Is.LessThan(-5));
     }
 
 
@@ -33,7 +55,7 @@ public class MainPageTests : AppiumSetup
     public async Task ClickRunAllTest()
     {
 
-        IReadOnlyCollection<AppiumElement> btnElements = driver.FindElements(By.XPath("//Button"));
+        IReadOnlyCollection<AppiumElement> btnElements = driver.FindElements(By.XPath("//android.widget.Button"));
 
         AppiumElement? btn = null;
         foreach (var element in btnElements)
@@ -46,7 +68,7 @@ public class MainPageTests : AppiumSetup
             }
         }
 
-        Assert.That(btn, Is.Not.Null, "Run All button was not found.");
+        Assert.That(btn, Is.Not.Null, "Run All button was not found. Number of elements in btnElements: " + btnElements.Count);
 
         while (!btn.Enabled)
         {
@@ -54,7 +76,7 @@ public class MainPageTests : AppiumSetup
             await Task.Delay(500);
         }
 
-        IReadOnlyCollection<AppiumElement> labelElements = driver.FindElements(By.XPath("//Text"));
+        IReadOnlyCollection<AppiumElement> labelElements = driver.FindElements(By.XPath("//android.widget.TextView"));
         int numPassed = -1;
         int numFailed = -1;
 
@@ -74,26 +96,44 @@ public class MainPageTests : AppiumSetup
                 numFailed = int.Parse(labelElements.ElementAt(i).Text);
                 element.Click();
                 await Task.Delay(1000);
+                browserStackLog("CLICKED =================");
                 break;
             }
         }
 
+        browserStackLog("numPassed: " + numPassed);
+        browserStackLog("numFailed: " + numFailed);
         // if either of these are -1, then we couldn't find the correct labels;
-        Assert.True(numPassed >= 0, "Could not find number passed label.");
-        Assert.True(numFailed >= 0, "Could not find number failed label.");
+
+        //Assert.That(numPassed, Is.LessThan(-5), "Could not find number passed label." + numPassed);
+        //Assert.That(numFailed, Is.LessThan(-5), "Could not find number failed label." + numFailed);
+        Assert.That(numPassed, Is.GreaterThanOrEqualTo(0), "Could not find number passed label.");
+        Assert.That(numFailed, Is.GreaterThanOrEqualTo(0), "Could not find number failed label.");
+
+        browserStackLog("After the AssertMultiple block");
 
         if (numFailed == 0)
         {
+            browserStackLog("In the num failed == 0 if block");
             // all tests passed! wahoo!
             return;
         }
 
-        AppiumElement filterSelector = driver.FindElement(By.XPath("//ComboBox"));
+        browserStackLog("Now past clicking into the test details screen and attempting to filter for failed tests");
+        IReadOnlyCollection<AppiumElement> editTextOptions = driver.FindElements(By.XPath("//android.widget.EditText"));
 
-        filterSelector.Click();
-        await Task.Delay(500);
+        foreach (var editTextOption in editTextOptions)
+        {
+            browserStackLog("We are at the edit text option with the text: " + editTextOption.Text);
+            if (editTextOption.Text.Equals("All"))
+            {
+                editTextOption.Click();
+                await Task.Delay(500);
+                break;
+            }
+        }
 
-        IReadOnlyCollection<AppiumElement> filterOptions = driver.FindElements(By.XPath("//ListItem"));
+        IReadOnlyCollection<AppiumElement> filterOptions = driver.FindElements(By.XPath("//android.widget.TextView"));
 
         foreach (var filterOption in filterOptions)
         {
@@ -109,14 +149,14 @@ public class MainPageTests : AppiumSetup
 
         sb.AppendLine("PASSED TESTS: " + numPassed + " | FAILED TESTS: " + numFailed);
 
-        IReadOnlyCollection<AppiumElement> textResults = driver.FindElements(By.XPath("//Text"));
+        IReadOnlyCollection<AppiumElement> textResults = driver.FindElements(By.XPath("//android.widget.TextView"));
 
         foreach (var element in textResults)
         {
             sb.AppendLine(element.Text);
         }
 
-        Assert.True(numFailed == 0, sb.ToString());
+        Assert.That(numFailed, Is.EqualTo(0), sb.ToString());
 
     }
 }

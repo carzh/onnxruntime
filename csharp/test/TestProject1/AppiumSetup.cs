@@ -4,8 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using NUnit.Framework.Interfaces;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Android;
+using Newtonsoft.Json;
 
 namespace TestProject1;
 public class AppiumSetup
@@ -44,9 +47,30 @@ public class AppiumSetup
         driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), androidOptions);
     }
 
+    public void browserStackLog(String text)
+    {
+        ((IJavaScriptExecutor)driver).ExecuteScript("browserstack_executor: {\"action\": \"annotate\", \"arguments\": {\"data\":\"" + text + "\", \"level\": \"info\"}}");
+    }
+
     [TearDown]
     public void Dispose()
     {
+        browserStackLog("Inside the Dispose function");
+        // According to https://www.browserstack.com/docs/app-automate/appium/set-up-tests/mark-tests-as-pass-fail
+        // BrowserStack doesn't know whether test assertions have passed or failed. Below handles
+        // passing the test status to BrowserStack along with any relevant information.
+        if (TestContext.CurrentContext.Result.Outcome.Status == TestStatus.Failed)
+        {
+            // Get information about the failed test
+            string testName = TestContext.CurrentContext.Test.Name;
+            string failureMessage = TestContext.CurrentContext.Result.Message;
+
+            ((IJavaScriptExecutor)driver).ExecuteScript("browserstack_executor: {\"action\": \"setSessionStatus\", \"arguments\": {\"status\":\"failed\", \"reason\": " + JsonConvert.ToString(failureMessage) + "}}");
+        } else
+        {
+            ((IJavaScriptExecutor)driver).ExecuteScript("browserstack_executor: {\"action\": \"setSessionStatus\", \"arguments\": {\"status\":\"passed\", \"reason\": \"\"}}");
+        }
+
         driver?.Quit();
     }
 }
