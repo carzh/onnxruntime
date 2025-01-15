@@ -42,8 +42,8 @@ test project only targets net8 and netstandard2.0.
         If new bindings have been added recently you will get error when those are initialized if the native code is out
         of date and does not match.
         -->
-        <UsePrebuiltNativePackage Condition="'$(UsePrebuiltNativePackage)' == ''">false</UsePrebuiltNativePackage>
-        <CurrentOnnxRuntimeVersion Condition="'$(CurrentOnnxRuntimeVersion)' == ''">1.20.0-dev-20241007</CurrentOnnxRuntimeVersion>
+        <UsePrebuiltNativePackage Condition="'$(UsePrebuiltNativePackage)' == ''">true</UsePrebuiltNativePackage>
+        <CurrentOnnxRuntimeVersion Condition="'$(CurrentOnnxRuntimeVersion)' == ''">1.21.0-dev-20250110-1201-1ce59577d5</CurrentOnnxRuntimeVersion>
     </PropertyGroup>
 
     <!-- debug output - makes finding/fixing any issues with the the conditions easy.  -->
@@ -161,10 +161,10 @@ test project only targets net8 and netstandard2.0.
     </PropertyGroup>
 
     <Target Name="DumpLocalBuild" BeforeTargets="PreBuildEvent">
-        <Message Text="Prebuilt runtime=$(UsePrebuiltNativePackage)" />
-        <Message Text="NativeBuildOutputDir=$(NativeBuildOutputDir)" />
+        <Message Importance="High" Text="Prebuilt runtime=$(UsePrebuiltNativePackage)" />
+        <Message Importance="High" Text="NativeBuildOutputDir=$(NativeBuildOutputDir)" />
         <Message Text="onnxruntime.dll from local build=$(HaveOrtDll)" />
-        <Message Text="libonnxruntime.so from local build=$(HaveOrtSo)" />
+        <Message Importance="High" Text="libonnxruntime.so from local build=$(HaveOrtSo)" />
         <Message Text="libonnxruntime.dylib from local build=$(HaveOrtDylib)" />
     </Target>
 
